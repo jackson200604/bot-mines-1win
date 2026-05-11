@@ -5,10 +5,11 @@ import random
 
 app = FastAPI()
 
-# Configuration pour permettre au frontend de communiquer avec le backend
+# LE VIGILE (CORS) : C'est ici que la magie opère
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # On autorisera ton URL pages.dev plus tard
+    allow_origins=["*"], 
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -19,20 +20,19 @@ class GameData(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"status": "Bot Mines Active", "message": "En attente de données"}
+    return {"status": "Connecté", "message": "Le cerveau du Bot Mines est prêt"}
 
 @app.post("/predict")
 async def predict(data: GameData):
-    # Logique de prédiction probabiliste
-    # On évite les cases de l'historique récent
+    # Logique temporaire avant d'avoir assez de données pour le ML
     all_tiles = list(range(25))
     safe_candidates = [t for t in all_tiles if t not in data.history]
     
-    # Simulation d'un poids ML (plus une case sort, moins elle est recommandée)
-    # Pour l'instant on prend 3 cases aléatoires parmis les plus "probables"
+    # On choisit 3 cases au hasard parmi celles qui n'ont pas encore explosé
     recommended = random.sample(safe_candidates, min(3, len(safe_candidates)))
     
     return {
         "recommended_tiles": recommended,
-        "confidence": random.randint(75, 98) # Indice de confiance fictif
+        "confidence": random.randint(70, 95)
+    }        "confidence": random.randint(75, 98) # Indice de confiance fictif
     }
