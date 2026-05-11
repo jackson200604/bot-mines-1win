@@ -5,7 +5,6 @@ import random
 
 app = FastAPI()
 
-# LE VIGILE (CORS) : C'est ici que la magie opère
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -24,15 +23,16 @@ def read_root():
 
 @app.post("/predict")
 async def predict(data: GameData):
-    # Logique temporaire avant d'avoir assez de données pour le ML
     all_tiles = list(range(25))
     safe_candidates = [t for t in all_tiles if t not in data.history]
     
-    # On choisit 3 cases au hasard parmi celles qui n'ont pas encore explosé
+    # Sécurité au cas où toutes les cases seraient pleines
+    if not safe_candidates:
+        return {"recommended_tiles": [], "confidence": 0}
+
     recommended = random.sample(safe_candidates, min(3, len(safe_candidates)))
     
     return {
         "recommended_tiles": recommended,
-        "confidence": random.randint(70, 95)
-    }        "confidence": random.randint(75, 98) # Indice de confiance fictif
+        "confidence": random.randint(75, 98)
     }
