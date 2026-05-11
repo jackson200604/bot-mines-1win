@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Mines Predictor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tile { width: 60px; height: 60px; cursor: pointer; transition: 0.3s; }
+        .tile.selected { background-color: #ef4444; border-color: #b91c1c; }
+        .tile.recommended { background-color: #22c55e; border-color: #15803d; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body class="bg-slate-900 text-white font-sans p-4">
+    <div class="max-w-md mx-auto text-center">
+        <h1 class="text-2xl font-bold mb-4 text-blue-400">🤖 MINES PREDICTOR AI</h1>
+        
+        <div class="bg-slate-800 p-4 rounded-lg mb-6 shadow-xl">
+            <p class="text-sm mb-4 text-slate-300">Sélectionnez les mines des parties précédentes :</p>
+            <div id="grid" class="grid grid-cols-5 gap-2 justify-center mb-6">
+                </div>
+            
+            <button onclick="getPrediction()" id="btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition">
+                OBTENIR LA PRÉDICTION
+            </button>
+        </div>
+
+        <div id="result" class="hidden bg-slate-800 p-4 rounded-lg border border-blue-500">
+            <p class="text-blue-400 font-bold">RECOMMANDATION :</p>
+            <p id="tiles-text" class="text-xl"></p>
+            <p id="confidence-text" class="text-sm text-slate-400 mt-2"></p>
+        </div>
+    </div>
+
+    <script>
+        const grid = document.getElementById('grid');
+        let selectedTiles = [];
+        const BACKEND_URL = "https://bot-mines-1win.onrender.com";
+
+        // Création de la grille 5x5
+        for (let i = 0; i < 25; i++) {
+            const tile = document.createElement('div');
+            tile.className = "tile border-2 border-slate-600 bg-slate-700 rounded-md flex items-center justify-center text-xs text-slate-500";
+            tile.innerText = i;
+            tile.onclick = () => {
+                tile.classList.toggle('selected');
+                if (selectedTiles.includes(i)) selectedTiles = selectedTiles.filter(t => t !== i);
+                else selectedTiles.push(i);
+            };
+            grid.appendChild(tile);
+        }
+
+        async function getPrediction() {
+            const btn = document.getElementById('btn');
+            btn.innerText = "Calcul en cours...";
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/predict`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ history: selectedTiles, mines_count: 3 })
+                });
+                const data = await response.json();
+                
+                // Reset recommandations précédentes
+                document.querySelectorAll('.tile').forEach(t => t.classList.remove('recommended'));
+                
+                // Afficher les nouvelles
+                data.recommended_tiles.forEach(index => {
+                    grid.children[index].classList.add('recommended');
+                });
+
+                document.getElementById('result').classList.remove('hidden');
+                document.getElementById('tiles-text').innerText = `Cases : ${data.recommended_tiles.join(', ')}`;
+                document.getElementById('confidence-text').innerText = `Confiance : ${data.confidence}%`;
+            } catch (err) {
+                alert("Erreur de connexion au backend Render");
+            } finally {
+                btn.innerText = "OBTENIR LA PRÉDICTION";
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
