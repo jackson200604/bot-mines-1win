@@ -1,38 +1,93 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import random
+import os
+import cv2
+import numpy as np
+import pandas as pd
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
 
-app = FastAPI()
+app = Flask(__name__)
+CORS(app)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+CSV_FILE = 'mines_data.csv'
+UPLOAD_FOLDER = 'temp_uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-class GameData(BaseModel):
-    history: list = []
-    mines_count: int = 3
+# Création du fichier CSV s'il n'existe pas
+if not os.path.exists(CSV_FILE):
+    df = pd.DataFrame(columns=[f'cell_{i}' for i in range(25)])
+    df.to_csv(CSV_FILE, index=False)
 
-@app.get("/")
-def read_root():
-    return {"status": "Connecté", "message": "Le cerveau du Bot Mines est prêt"}
+def save_mines(mines_list):
+    if not mines_list: return
+    df = pd.read_csv(CSV_FILE)
+    row = [1 if i in mines_list else 0 for i in range(25)]
+    df.loc[len(df)] = row
+    df.to_csv(CSV_FILE, index=False)
 
-@app.post("/predict")
-async def predict(data: GameData):
-    all_tiles = list(range(25))
-    safe_candidates = [t for t in all_tiles if t not in data.history]
+# Route 1 : Enregistrement manuel via Overlay
+@app.route('/train', methods=['POST'])
+def train_manual():
+    data = request.json
+    mines = data.get('mines', [])
+    save_mines(mines)
+    return jsonify({"status": "success"})
+
+# Route 2 : Prédiction intelligente
+@app.route('/predict', methods=['POST'])
+def predict():
+    df = pd.read_csv(CSV_FILE)
+    if len(df) < 5:
+        # Valeurs par défaut si le bot n'a pas encore assez appris
+        return jsonify({"predictions": [12, 14, 18]})
     
-    # Sécurité au cas où toutes les cases seraient pleines
-    if not safe_candidates:
-        return {"recommended_tiles": [], "confidence": 0}
+    # Cherche les cases avec le MOINS de mines
+    probabilities = df.sum().sort_values()
+    best_cells = [int(col.split('_')[1]) for col in probabilities.head(3).index]
+    return jsonify({"predictions": best_cells})
 
-    recommended = random.sample(safe_candidates, min(3, len(safe_candidates)))
+# Route 3 : Analyse des vidéos XRecorder
+@app.route('/process_video', methods=['POST'])
+def process_video():
+    if 'file' not in request.files:
+        return jsonify({"error": "Aucun fichier envoyé"}), 400
     
-    return {
-        "recommended_tiles": recommended,
-        "confidence": random.randint(75, 98)
-    }
+    video = request.files['file']
+    filename = secure_filename(video.filename)
+    path = os.path.join(UPLOAD_FOLDER, filename)
+    video.save(path)
+
+    cap = cv2.VideoCapture(path)
+    sessions_found = 0
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret: break
+
+        # Analyse d'une image toutes les 30 frames
+        if int(cap.get(cv2.CAP_PROP_POS_FRAMES)) % 30 == 0:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            h, w = gray.shape
+            roi = gray[int(h*0.25):int(h*0.7), int(w*0.1):int(w*0.9)]
+            _, thresh = cv2.threshold(roi, 180, 255, cv2.THRESH_BINARY)
+            
+            gh, gw = thresh.shape
+            cell_h, cell_w = gh // 5, gw // 5
+            current_mines = []
+            
+            for r in range(5):
+                for c in range(5):
+                    cell = thresh[r*cell_h:(r+1)*cell_h, c*cell_w:(c+1)*cell_w]
+                    if cv2.countNonZero(cell) > (cell_h * cell_w * 0.15):
+                        current_mines.append(r * 5 + c)
+            
+            if len(current_mines) > 0:
+                save_mines(current_mines)
+                sessions_found += 1
+
+    cap.release()
+    os.remove(path) # Nettoie la vidéo après analyse
+    return jsonify({"status": "finished", "sessions_found": sessions_found})
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
