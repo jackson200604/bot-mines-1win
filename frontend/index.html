@@ -3,90 +3,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mines Bot AI</title>
+    <title>Mines AI Analyst</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #0f172a; font-family: sans-serif; }
-        .grid-cell { aspect-ratio: 1/1; border: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
-        .grid-cell.active { background-color: #ef4444; }
-        .grid-cell.predict { background-color: #22c55e; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .grid-cell { aspect-ratio: 1/1; border: 1px solid rgba(255,255,255,0.05); }
+        .active { background-color: #ef4444; box-shadow: 0 0 10px #ef4444; }
+        .predict-zone { background-color: #22c55e; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; }
     </style>
 </head>
-<body class="text-white p-3">
-    <div class="flex justify-between items-center mb-3">
-        <h1 class="text-[10px] font-black text-blue-500 uppercase">BOT ANALYST v2.0</h1>
-        <button onclick="resetGrid()" class="text-[9px] bg-slate-700 px-2 py-1 rounded">RESET</button>
+<body class="text-white">
+
+    <div class="flex justify-between items-center p-3 bg-slate-900 border-b border-slate-800">
+        <div>
+            <h1 class="text-[10px] font-black text-blue-500">BOT ANALYST v2.0</h1>
+            <p class="text-[8px] text-gray-400 font-mono">DB: <span id="db-count" class="text-green-500">0</span> sessions</p>
+        </div>
+        <button onclick="resetAll()" class="text-[9px] bg-slate-700 px-2 py-1 rounded">RESET</button>
     </div>
-    <div id="grid" class="grid grid-cols-5 gap-1 w-full mb-4"></div>
-    <div class="grid grid-cols-2 gap-2 mb-4">
-        <button onclick="getPrediction()" class="bg-blue-600 py-3 rounded-lg font-bold text-xs shadow-lg">PRÉDIRE 🎯</button>
-        <button onclick="sendToDatabase()" class="bg-indigo-600 py-3 rounded-lg font-bold text-[10px] shadow-lg">ENREGISTRER ✖️</button>
+
+    <div class="flex bg-slate-900 text-[10px] font-bold uppercase">
+        <div id="tab-pred" onclick="showPage('prediction')" class="flex-1 py-3 text-center cursor-pointer tab-active">Prédiction</div>
+        <div id="tab-train" onclick="showPage('training')" class="flex-1 py-3 text-center cursor-pointer text-gray-500">Entraînement</div>
     </div>
-    <div class="border-t border-slate-700 pt-3">
-        <input type="file" id="videoFile" accept="video/*" class="hidden" onchange="handleUpload()">
-        <button id="uploadBtn" onclick="document.getElementById('videoFile').click()" class="w-full bg-slate-800 border border-slate-600 py-2 rounded text-[10px] text-slate-300">SCANNER UNE VIDÉO (XRecorder)</button>
+
+    <div class="p-4">
+        <div id="page-prediction">
+            <div class="flex items-center justify-between mb-4 bg-slate-800 p-2 rounded-lg">
+                <span class="text-[10px] text-gray-300">Mode de jeu :</span>
+                <select id="mine-count" class="bg-slate-700 text-[10px] rounded px-2 py-1 outline-none">
+                    <option value="1">1 MINE</option>
+                    <option value="3" selected>3 MINES</option>
+                    <option value="5">5 MINES</option>
+                </select>
+            </div>
+            <div id="grid-pred" class="grid grid-cols-5 gap-1 w-full mb-6"></div>
+            <button onclick="getPrediction()" class="w-full bg-blue-600 py-4 rounded-xl font-black text-xs shadow-lg active:scale-95 transition">
+                GÉNÉRER PRÉDICTION 🎯
+            </button>
+        </div>
+
+        <div id="page-training" class="hidden">
+            <p class="text-[9px] text-gray-400 mb-2 italic">Cochez les mines révélées à la fin du jeu :</p>
+            <div id="grid-train" class="grid grid-cols-5 gap-1 w-full mb-4"></div>
+            <button onclick="sendToDatabase()" class="w-full bg-indigo-600 py-3 rounded-lg font-bold text-xs mb-6 shadow-lg">
+                ENREGISTRER LA SESSION ✖️
+            </button>
+            <div class="border-t border-slate-800 pt-4">
+                <input type="file" id="videoFile" accept="video/*" class="hidden" onchange="handleUpload()">
+                <button id="uploadBtn" onclick="document.getElementById('videoFile').click()" class="w-full bg-slate-800 border border-slate-700 py-3 rounded text-[10px] text-slate-400">
+                    SCANNER VIDÉO XRECORDER
+                </button>
+            </div>
+        </div>
     </div>
+
     <script>
         const API_URL = 'https://bot-mines-1win.onrender.com';
-        let selectedMines = [];
-        const grid = document.getElementById('grid');
-        for (let i = 0; i < 25; i++) {
-            const cell = document.createElement('div');
-            cell.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] font-bold text-slate-500';
-            cell.innerText = i;
-            cell.onclick = () => {
-                if (selectedMines.includes(i)) {
-                    selectedMines = selectedMines.filter(m => m !== i);
-                    cell.classList.remove('active');
-                } else {
-                    selectedMines.push(i);
-                    cell.classList.add('active');
-                }
-            };
-            grid.appendChild(cell);
+        let trainingMines = [];
+
+        function init() {
+            const gP = document.getElementById('grid-pred');
+            const gT = document.getElementById('grid-train');
+            for(let i=0; i<25; i++) {
+                const cP = document.createElement('div');
+                cP.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] text-slate-600';
+                cP.innerText = i;
+                gP.appendChild(cP);
+
+                const cT = document.createElement('div');
+                cT.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] text-slate-500';
+                cT.innerText = i;
+                cT.onclick = () => {
+                    if(trainingMines.includes(i)) {
+                        trainingMines = trainingMines.filter(m => m !== i);
+                        cT.classList.remove('active');
+                    } else {
+                        trainingMines.push(i);
+                        cT.classList.add('active');
+                    }
+                };
+                gT.appendChild(cT);
+            }
+            updateStats();
         }
-        function resetGrid() {
-            selectedMines = [];
-            document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('active', 'predict'));
+
+        async function updateStats() {
+            try {
+                const res = await fetch(`${API_URL}/stats`);
+                const data = await res.json();
+                document.getElementById('db-count').innerText = data.total_sessions;
+            } catch(e) { console.log("Erreur stats"); }
         }
+
+        function showPage(page) {
+            document.getElementById('page-prediction').classList.toggle('hidden', page !== 'prediction');
+            document.getElementById('page-training').classList.toggle('hidden', page !== 'training');
+            document.getElementById('tab-pred').classList.toggle('tab-active', page === 'prediction');
+            document.getElementById('tab-train').classList.toggle('tab-active', page === 'training');
+        }
+
         async function getPrediction() {
+            const count = document.getElementById('mine-count').value;
+            document.querySelectorAll('#grid-pred .grid-cell').forEach(c => c.classList.remove('predict-zone'));
             try {
                 const res = await fetch(`${API_URL}/predict`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ mines: selectedMines })
+                    body: JSON.stringify({ count: count })
                 });
                 const data = await res.json();
-                data.predictions.forEach(id => { document.querySelectorAll('.grid-cell')[id].classList.add('predict'); });
-            } catch (e) { alert("Erreur Serveur Render"); }
+                data.predictions.forEach(id => {
+                    document.querySelectorAll('#grid-pred .grid-cell')[id].classList.add('predict-zone');
+                });
+            } catch(e) { alert("Erreur Serveur"); }
         }
+
         async function sendToDatabase() {
-            if (selectedMines.length === 0) return alert("Sélectionne les croix !");
+            if(trainingMines.length === 0) return alert("Cochez les mines !");
             try {
                 await fetch(`${API_URL}/train`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ mines: selectedMines })
+                    body: JSON.stringify({ mines: trainingMines })
                 });
-                alert("Appris ! ✅");
-                resetGrid();
-            } catch (e) { alert("Erreur"); }
+                alert("Appris !");
+                trainingMines = [];
+                document.querySelectorAll('#grid-train .grid-cell').forEach(c => c.classList.remove('active'));
+                updateStats();
+            } catch(e) { alert("Erreur"); }
         }
+
         async function handleUpload() {
             const file = document.getElementById('videoFile').files[0];
-            if (!file) return;
+            if(!file) return;
             const btn = document.getElementById('uploadBtn');
-            btn.innerText = "ANALYSE...";
+            btn.innerText = "ANALYSE EN COURS...";
             const formData = new FormData();
             formData.append('file', file);
             try {
-                const res = await fetch(`${API_URL}/process_video`, { method: 'POST', body: formData });
-                const data = await res.json();
-                alert("Cerveau mis à jour !");
-            } catch (e) { alert("Erreur vidéo"); }
-            btn.innerText = "SCANNER UNE VIDÉO (XRecorder)";
+                await fetch(`${API_URL}/process_video`, { method: 'POST', body: formData });
+                alert("Cerveau mis à jour via vidéo !");
+                updateStats();
+            } catch(e) { alert("Erreur vidéo"); }
+            btn.innerText = "SCANNER VIDÉO XRECORDER";
         }
+
+        function resetAll() {
+            document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('active', 'predict-zone'));
+            trainingMines = [];
+        }
+
+        init();
     </script>
 </body>
 </html>
