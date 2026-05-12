@@ -1,15 +1,24 @@
-# Image de base légère
+# Utilise une version légère de Python
 FROM python:3.10-slim
 
-# Répertoire de travail
+# Installe les dépendances système nécessaires pour OpenCV
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Définit le dossier de travail
 WORKDIR /app
 
-# Installation des dépendances
+# Copie le fichier des dépendances et l'installe
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copie du code
+# Copie tout le reste du code
 COPY . .
 
-# Commande de lancement (utilise le port dynamique de Render)
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Crée le dossier pour les uploads si absent
+RUN mkdir -p temp_uploads
+
+# Lance l'application avec Gunicorn
+CMD gunicorn --bind 0.0.0.0:$PORT main:app
