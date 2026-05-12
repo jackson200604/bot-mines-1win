@@ -1,6 +1,5 @@
 flask
 flask-cors
 pandas
-opencv-python-headless
-numpy
-gunicorn
+pymongo[srv]
+dnspython
