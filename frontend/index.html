@@ -26,8 +26,8 @@
         <button onclick="getPrediction()" class="bg-blue-600 py-3 rounded-lg font-bold text-xs shadow-lg active:scale-95 transition">
             PRÉDIRE 🎯
         </button>
-        <button onclick="sendToDatabase()" class="bg-indigo-600 py-3 rounded-lg font-bold text-[10px] shadow-lg active:scale-95 transition">
-            ENREGISTRER ✖️
+        <button onclick="sendToDatabase()" class="bg-indigo-600 py-3 rounded-lg font-bold text-[10px] shadow-lg active:scale-95 transition text-center leading-tight">
+            ENREGISTRER <br> LES CROIX ✖️
         </button>
     </div>
 
@@ -40,12 +40,12 @@
     </div>
 
     <script>
-        // --- ⚠️ ATTENTION : METS TON URL RENDER CI-DESSOUS ⚠️ ---
         const API_URL = 'https://bot-mines-1win.onrender.com'; 
         
         let selectedMines = [];
         const grid = document.getElementById('grid');
 
+        // Créer la grille
         for (let i = 0; i < 25; i++) {
             const cell = document.createElement('div');
             cell.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] font-bold text-slate-500';
@@ -64,7 +64,7 @@
 
         function resetGrid() {
             selectedMines = [];
-            document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('active', 'predict'));
+            document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('active', 'predict', 'recommended'));
         }
 
         async function getPrediction() {
@@ -78,7 +78,7 @@
                 data.predictions.forEach(id => {
                     document.querySelectorAll('.grid-cell')[id].classList.add('predict');
                 });
-            } catch (e) { alert("Erreur Serveur (Vérifie ton URL Render)"); }
+            } catch (e) { alert("Erreur Serveur Render"); }
         }
 
         async function sendToDatabase() {
@@ -88,6 +88,35 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ mines: selectedMines })
+                });
+                alert("Données enregistrées ! ✅");
+                resetGrid();
+            } catch (e) { alert("Erreur d'enregistrement"); }
+        }
+
+        async function handleUpload() {
+            const file = document.getElementById('videoFile').files[0];
+            if (!file) return;
+
+            const btn = document.getElementById('uploadBtn');
+            btn.innerText = "ANALYSE EN COURS...";
+            btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch(`${API_URL}/process_video`, { method: 'POST', body: formData });
+                const data = await res.json();
+                alert(`Succès ! ${data.sessions_found} parties analysées.`);
+            } catch (e) { alert("Erreur vidéo"); }
+            
+            btn.innerText = "SCANNER UNE VIDÉO (XRecorder)";
+            btn.disabled = false;
+        }
+    </script>
+</body>
+</html>                    body: JSON.stringify({ mines: selectedMines })
                 });
                 alert("Appris avec succès ! ✅");
                 resetGrid();
