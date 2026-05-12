@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: bot-mines-backend
+    runtime: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    envVars:
+      - key: MONGO_URI
+        scope: run
+        value: # À configurer dans le dashboard Render
