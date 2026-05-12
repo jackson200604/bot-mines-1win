@@ -2,50 +2,51 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mines Bot Overlay</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root { --overlay-opacity: 0.9; }
-        body { background-color: rgba(15, 23, 42, var(--overlay-opacity)); font-family: sans-serif; overflow: hidden; }
-        .grid-cell { aspect-ratio: 1/1; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; }
-        .grid-cell.active { background-color: #ef4444 !important; border-color: #f87171; box-shadow: 0 0 10px #ef4444; }
-        .grid-cell.predict { background-color: #22c55e !important; border-color: #4ade80; animation: pulse 1s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        body { background-color: rgba(15, 23, 42, 0.9); overflow: hidden; font-family: sans-serif; }
+        .grid-cell { aspect-ratio: 1/1; border: 1px solid rgba(255,255,255,0.1); }
+        .grid-cell.active { background-color: #ef4444 !important; border-shadow: 0 0 8px #ef4444; }
+        .grid-cell.predict { background-color: #22c55e !important; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
-<body class="text-white p-1">
-    <div class="flex items-center justify-between mb-1 px-1">
-        <span class="text-[10px] text-gray-400">Opacité</span>
-        <input type="range" min="30" max="100" value="90" class="w-16 h-1" oninput="document.body.style.setProperty('--overlay-opacity', this.value/100)">
-        <button onclick="resetGrid()" class="text-[10px] bg-red-900/50 px-2 rounded">Clear</button>
+<body class="text-white p-2">
+
+    <div class="flex justify-between items-center mb-2">
+        <h1 class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Mines AI v2</h1>
+        <button onclick="resetGrid()" class="text-[10px] bg-slate-700 px-2 py-1 rounded">Vider</button>
     </div>
 
-    <div id="grid" class="grid grid-cols-5 gap-1 w-full h-auto"></div>
+    <div id="grid" class="grid grid-cols-5 gap-1 w-full mb-3"></div>
 
-    <div class="mt-2 space-y-1">
-        <div class="flex gap-1">
-            <select id="mineCount" class="bg-slate-800 text-[10px] rounded px-1 flex-1 border border-slate-700">
-                <option value="3">3 Mines</option>
-                <option value="5">5 Mines</option>
-                <option value="10">10 Mines</option>
-            </select>
-            <button onclick="getPrediction()" class="bg-blue-600 text-[11px] font-bold py-2 px-3 rounded flex-[2] active:scale-95 transition">PREDIRE</button>
-        </div>
-        
-        <button onclick="sendToDatabase()" class="w-full bg-purple-600/80 py-1 rounded text-[9px] uppercase font-bold">
-            Enregistrer les Croix ✖️
+    <div class="grid grid-cols-2 gap-2 mb-3">
+        <button onclick="getPrediction()" class="bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold text-xs shadow-lg uppercase">
+            Prédire
+        </button>
+        <button onclick="sendToDatabase()" class="bg-purple-600 hover:bg-purple-700 py-3 rounded-lg font-bold text-[10px] shadow-lg uppercase leading-tight">
+            Enregistrer <br> les croix ✖️
+        </button>
+    </div>
+
+    <div class="border-t border-slate-700 pt-2 mt-2">
+        <input type="file" id="videoFile" accept="video/*" class="hidden">
+        <button onclick="document.getElementById('videoFile').click()" class="w-full bg-slate-800 py-2 rounded text-[9px] text-gray-400">
+            Scanner une vidéo (XRecorder)
         </button>
     </div>
 
     <script>
+        const API_URL = 'https://ton-application.onrender.com'; // REMPLACE PAR TON LIEN RENDER
         const grid = document.getElementById('grid');
         let selectedMines = [];
 
-        // Génération de la grille
+        // Création des 25 cases
         for (let i = 0; i < 25; i++) {
             const cell = document.createElement('div');
-            cell.className = 'grid-cell bg-slate-800 flex items-center justify-center text-[10px] font-bold';
+            cell.className = 'grid-cell bg-slate-800 rounded flex items-center justify-center text-[10px] cursor-pointer';
             cell.innerText = i;
             cell.onclick = () => {
                 if (selectedMines.includes(i)) {
@@ -65,31 +66,34 @@
         }
 
         async function getPrediction() {
-            // Simulation de l'appel API Render (Remplace par ton URL réelle)
-            console.log("Calcul avec les mines jouées:", selectedMines);
-            // Ici, on ajoute l'animation de prédiction sur 3 cases aléatoires en attendant tes vraies données
-            const mockPredict = [Math.floor(Math.random()*25), Math.floor(Math.random()*25)];
-            mockPredict.forEach(id => document.querySelectorAll('.grid-cell')[id].classList.add('predict'));
+            try {
+                const response = await fetch(`${API_URL}/predict`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ mines: selectedMines })
+                });
+                const data = await response.json();
+                data.predictions.forEach(id => {
+                    document.querySelectorAll('.grid-cell')[id].classList.add('predict');
+                });
+            } catch (e) { alert("Erreur de connexion au serveur"); }
         }
 
-        function sendToDatabase() {
-            if(selectedMines.length === 0) return;
-            // Logique d'envoi vers Render /data.csv
-            console.log("Mines envoyées au serveur:", selectedMines);
-            alert("Données apprises ! ✅");
-            resetGrid();
+        async function sendToDatabase() {
+            if(selectedMines.length === 0) return alert("Coche les croix d'abord !");
+            try {
+                await fetch(`${API_URL}/train`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ mines: selectedMines })
+                });
+                alert("Apprentissage réussi ! ✅");
+                resetGrid();
+            } catch (e) { alert("Erreur d'enregistrement"); }
         }
     </script>
 </body>
-</html>        const grid = document.getElementById('grid');
-        let selectedTiles = [];
-        const BACKEND_URL = "https://bot-mines-1win.onrender.com";
-
-        // Création de la grille 5x5
-        for (let i = 0; i < 25; i++) {
-            const tile = document.createElement('div');
-            tile.className = "tile border-2 border-slate-600 bg-slate-700 rounded-md flex items-center justify-center text-xs text-slate-500";
-            tile.innerText = i;
+</html>            tile.innerText = i;
             tile.onclick = () => {
                 tile.classList.toggle('selected');
                 if (selectedTiles.includes(i)) selectedTiles = selectedTiles.filter(t => t !== i);
