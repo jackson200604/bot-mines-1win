@@ -3,36 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mines Bot AI</title>
+    <title>Mines Bot v2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: rgba(15, 23, 42, 0.9); font-family: sans-serif; overflow-x: hidden; }
-        .grid-cell { aspect-ratio: 1/1; border: 1px solid rgba(255,255,255,0.05); transition: 0.2s; }
-        .grid-cell.active { background-color: #ef4444; box-shadow: inset 0 0 10px #000; }
-        .grid-cell.predict { background-color: #22c55e; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        body { background-color: #0f172a; font-family: sans-serif; overflow: hidden; }
+        .grid-cell { aspect-ratio: 1/1; border: 1px solid rgba(255,255,255,0.05); }
+        .grid-cell.active { background-color: #ef4444; }
+        .grid-cell.predict { background-color: #22c55e; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
 <body class="text-white p-3">
 
     <div class="flex justify-between items-center mb-3">
-        <h1 class="text-[10px] font-black text-blue-500 uppercase tracking-tighter">BOT ANALYST v2.0</h1>
-        <button onclick="resetGrid()" class="text-[9px] bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">RESET</button>
+        <h1 class="text-[10px] font-black text-blue-500">BOT ANALYST V2.0</h1>
+        <button onclick="resetGrid()" class="text-[9px] bg-slate-700 px-2 py-1 rounded">RESET</button>
     </div>
 
     <div id="grid" class="grid grid-cols-5 gap-1 w-full mb-4"></div>
 
     <div class="grid grid-cols-2 gap-2 mb-4">
-        <button onclick="getPrediction()" class="bg-blue-600 py-3 rounded-lg font-bold text-xs shadow-lg active:scale-95 transition">
+        <button onclick="getPrediction()" class="bg-blue-600 py-3 rounded-lg font-bold text-xs shadow-lg">
             PRÉDIRE 🎯
         </button>
-        <button onclick="sendToDatabase()" class="bg-indigo-600 py-3 rounded-lg font-bold text-[10px] shadow-lg active:scale-95 transition text-center leading-tight">
-            ENREGISTRER <br> LES CROIX ✖️
+        <button onclick="sendToDatabase()" class="bg-indigo-600 py-3 rounded-lg font-bold text-[10px] shadow-lg">
+            ENREGISTRER ✖️
         </button>
     </div>
 
     <div class="border-t border-slate-700 pt-3">
-        <p class="text-[9px] text-gray-500 mb-2 italic">Entraînement Automatique :</p>
         <input type="file" id="videoFile" accept="video/*" class="hidden" onchange="handleUpload()">
         <button id="uploadBtn" onclick="document.getElementById('videoFile').click()" class="w-full bg-slate-800 border border-slate-600 py-2 rounded text-[10px] text-slate-300">
             SCANNER UNE VIDÉO (XRecorder)
@@ -40,12 +39,10 @@
     </div>
 
     <script>
-        const API_URL = 'https://bot-mines-1win.onrender.com'; 
-        
+        const API_URL = 'https://bot-mines-1win.onrender.com';
         let selectedMines = [];
         const grid = document.getElementById('grid');
 
-        // Créer la grille
         for (let i = 0; i < 25; i++) {
             const cell = document.createElement('div');
             cell.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] font-bold text-slate-500';
@@ -64,7 +61,7 @@
 
         function resetGrid() {
             selectedMines = [];
-            document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('active', 'predict', 'recommended'));
+            document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('active', 'predict'));
         }
 
         async function getPrediction() {
@@ -82,14 +79,35 @@
         }
 
         async function sendToDatabase() {
-            if (selectedMines.length === 0) return alert("Sélectionne d'abord les croix !");
+            if (selectedMines.length === 0) return alert("Sélectionne les croix !");
             try {
                 await fetch(`${API_URL}/train`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ mines: selectedMines })
                 });
-                alert("Données enregistrées ! ✅");
+                alert("Appris avec succès ! ✅");
+                resetGrid();
+            } catch (e) { alert("Erreur d'enregistrement"); }
+        }
+
+        async function handleUpload() {
+            const file = document.getElementById('videoFile').files[0];
+            if (!file) return;
+            const btn = document.getElementById('uploadBtn');
+            btn.innerText = "ANALYSE EN COURS...";
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const res = await fetch(`${API_URL}/process_video`, { method: 'POST', body: formData });
+                const data = await res.json();
+                alert("Terminé ! Le cerveau a été mis à jour.");
+            } catch (e) { alert("Erreur vidéo"); }
+            btn.innerText = "SCANNER UNE VIDÉO (XRecorder)";
+        }
+    </script>
+</body>
+</html>                alert("Données enregistrées ! ✅");
                 resetGrid();
             } catch (e) { alert("Erreur d'enregistrement"); }
         }
