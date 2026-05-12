@@ -23,5 +23,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Commande de démarrage (on utilise Gunicorn pour la stabilité)
-# Remplace 'main' par le nom de ton fichier si besoin (ex: app:app)
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
+# Accepte la variable d'environnement PORT pour Render
+CMD ["gunicorn", "--bind", "0.0.0.0:${PORT:-5000}", "main:app"]
