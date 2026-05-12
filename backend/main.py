@@ -8,8 +8,8 @@ app = Flask(__name__)
 CORS(app)
 
 # --- CONFIGURATION MONGODB ---
-# REMPLACE <db_password> PAR TON VRAI MOT DE PASSE CI-DESSOUS
-MONGO_URI = "mongodb+srv://admin:<jairu$06>@bookhook.gurhu0q.mongodb.net/?retryWrites=true&w=majority&appName=Bookhook"
+# Utilise la variable d'environnement MONGO_URI configurée dans Render
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://admin:<password>@bookhook.gurhu0q.mongodb.net/?retryWrites=true&w=majority&appName=Bookhook")
 
 try:
     client = MongoClient(MONGO_URI)
@@ -78,5 +78,4 @@ def get_training_history():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)    port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
