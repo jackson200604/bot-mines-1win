@@ -45,22 +45,23 @@ def train():
 def predict():
     data = request.json
     count = int(data.get('count', 3))
-    
+
     all_sessions = list(collection_train.find())
     if len(all_sessions) < 2:
         return jsonify({"predictions": [12, 7, 17, 2, 22][:count]})
 
-    counts = [0] * 25
-    for s in all_sessions:
-        grid = s.get('grid', [0]*25)
-        for idx, val in enumerate(grid):
-            counts[idx] += val
-            
-    indexed_counts = list(enumerate(counts))
-    indexed_counts.sort(key=lambda x: x[1])
-    best_cells = [x[0] for x in indexed_counts[:count]]
-    
-    return jsonify({"predictions": best_cells})
+    # Entraîne le modèle avec l'historique
+    history_data = [
+        {"tiles": s.get("mines", []), "mines": s.get("count", 3)}
+        for s in all_sessions
+    ]
+    predictor.train_from_history(history_data)
+
+    # Récupère les cases déjà ouvertes
+    current_history = data.get('current_history', [])
+    safe_tiles = predictor.get_safe_tiles(current_history, count)
+
+    return jsonify({"predictions": safe_tiles[:count]})
 
 @app.route('/stats', methods=['GET'])
 def get_stats():
