@@ -147,6 +147,7 @@
                 updateStats();
             } catch(e) { alert("Erreur"); }
         }
+        
 
         async function handleUpload() {
             const file = document.getElementById('videoFile').files[0];
@@ -162,12 +163,17 @@
             } catch(e) { alert("Erreur vidéo"); }
             btn.innerText = "SCANNER VIDÉO XRECORDER";
         }
-
         function resetAll() {
             document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('active', 'predict-zone'));
             trainingMines = [];
         }
-
+        <div class="prediction-container">
+    <div id="numbers-display">-- ; -- ; --</div>
+    <div id="confidence-box">
+        <span>Confiance :</span>
+        <span id="prob-value">0%</span>
+    </div>
+</d
         init();
     </script>
 </body>
