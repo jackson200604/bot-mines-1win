@@ -6,67 +6,89 @@
     <title>Mines AI Analyst</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #0f172a; }
-        .grid-cell { aspect-ratio: 1/1; border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s; }
-        .active { background-color: #ef4444; box-shadow: 0 0 10px #ef4444; }
+        body { background-color: #0f172a; font-family: sans-serif; overflow-x: hidden; }
+        .grid-cell { aspect-ratio: 1/1; border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s; cursor: pointer; }
+        .active { background-color: #ef4444 !important; box-shadow: 0 0 10px #ef4444; border: 1px solid white; }
         .predict-zone { 
             background-color: #00ff00 !important; 
             color: #000 !important; 
             font-weight: 900;
             box-shadow: 0 0 15px #00ff00; 
             animation: pulse 0.8s infinite;
+            border: 2px solid white !important;
         }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(0.95); } }
         .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; }
     </style>
 </head>
 <body class="text-white">
 
-    <div class="flex justify-between items-center p-3 bg-slate-900">
-        <h1 class="text-[10px] font-black text-blue-500 uppercase">Bot Analyst v2.0</h1>
-        <div class="text-[8px] text-gray-400 font-mono">DB: <span id="db-count" class="text-green-500">0</span></div>
+    <div class="flex justify-between items-center p-3 bg-slate-900 border-b border-slate-800">
+        <div>
+            <h1 class="text-[10px] font-black text-blue-500 uppercase">Bot Analyst v2.0</h1>
+            <p class="text-[8px] text-gray-400 font-mono">DB: <span id="db-count" class="text-green-500">0</span> sessions</p>
+        </div>
+        <button onclick="resetAll()" class="text-[9px] bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">RESET</button>
     </div>
 
-    <div id="prob-container" class="mx-4 mt-2 p-2 bg-slate-800 rounded border border-slate-700 hidden">
-        <div class="flex justify-between text-[10px] mb-1">
-            <span>CONFIANCE</span>
-            <span id="prob-value" class="font-bold text-green-400">0%</span>
+    <div id="prob-container" class="mx-4 mt-4 p-3 bg-slate-800 rounded-xl border border-slate-700 hidden">
+        <div class="flex justify-between items-center mb-1">
+            <span class="text-[9px] uppercase font-bold text-gray-400">Fiabilité du Signal</span>
+            <span id="prob-value" class="text-lg font-black text-green-400">0%</span>
         </div>
-        <div class="w-full bg-slate-900 h-1 rounded-full overflow-hidden">
+        <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
             <div id="prob-bar" class="bg-green-500 h-full w-0 transition-all duration-500"></div>
         </div>
     </div>
 
-    <div class="flex bg-slate-900 text-[10px] font-bold mt-2">
+    <div class="flex bg-slate-900 text-[10px] font-bold mt-2 border-b border-slate-800">
         <div id="tab-pred" onclick="showPage('prediction')" class="flex-1 py-3 text-center cursor-pointer tab-active">PRÉDICTION</div>
         <div id="tab-train" onclick="showPage('training')" class="flex-1 py-3 text-center cursor-pointer text-gray-500">ENTRAÎNEMENT</div>
     </div>
 
     <div class="p-4">
         <div id="page-prediction">
+            <div class="flex items-center justify-between mb-4 bg-slate-800 p-2 rounded-lg border border-slate-700">
+                <span class="text-[10px] text-gray-300 uppercase">Mines :</span>
+                <select id="mine-count" class="bg-slate-700 text-[10px] rounded px-2 py-1 outline-none">
+                    <option value="1">1 MINE</option>
+                    <option value="3" selected>3 MINES</option>
+                    <option value="5">5 MINES</option>
+                </select>
+            </div>
             <div id="grid-pred" class="grid grid-cols-5 gap-1 mb-6"></div>
-            <button onclick="getPrediction()" class="w-full bg-blue-600 py-4 rounded-xl font-black text-xs">GÉNÉRER SIGNAL 🎯</button>
+            <button onclick="getPrediction()" class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-black text-xs shadow-lg active:scale-95 transition">
+                GÉNÉRER SIGNAL 🎯
+            </button>
         </div>
 
         <div id="page-training" class="hidden">
+            <p class="text-[9px] text-gray-400 mb-2 italic text-center">Cochez l'emplacement des mines révélées :</p>
             <div id="grid-train" class="grid grid-cols-5 gap-1 mb-4"></div>
-            <button onclick="sendToDatabase()" class="w-full bg-indigo-600 py-3 rounded-lg font-bold text-xs">SAUVEGARDER ✖️</button>
+            <button onclick="sendToDatabase()" class="w-full bg-indigo-600 hover:bg-indigo-500 py-3 rounded-xl font-bold text-xs shadow-lg active:scale-95 transition">
+                ENREGISTRER LA SESSION ✖️
+            </button>
         </div>
     </div>
 
     <script>
-        const API_URL = 'https://bot-mines-1win.onrender.com';
+        // CONFIGURATION : Remplace par ton URL Render réelle
+        const API_URL = 'https://bot-mines-1win.onrender.com'; 
         let trainingMines = [];
 
+        // Initialisation des grilles
         function init() {
             const gP = document.getElementById('grid-pred');
             const gT = document.getElementById('grid-train');
+            
             for(let i=0; i<25; i++) {
+                // Grille Prédiction
                 const cP = document.createElement('div');
                 cP.className = 'grid-cell bg-slate-800 rounded flex items-center justify-center text-[10px] text-slate-600';
                 cP.innerText = i;
                 gP.appendChild(cP);
 
+                // Grille Entraînement
                 const cT = document.createElement('div');
                 cT.className = 'grid-cell bg-slate-800 rounded flex items-center justify-center text-[10px] text-slate-500';
                 cT.innerText = i;
@@ -84,163 +106,79 @@
             updateStats();
         }
 
+        // Mise à jour du compteur de sessions
         async function updateStats() {
             try {
                 const res = await fetch(`${API_URL}/stats`);
                 const data = await res.json();
-                document.getElementById('db-count').innerText = data.total_sessions;
-            } catch(e) {}
+                document.getElementById('db-count').innerText = data.total_sessions || 0;
+            } catch(e) { console.warn("Serveur déconnecté"); }
         }
 
-        async function getPrediction() {
-            document.querySelectorAll('#grid-pred .grid-cell').forEach(c => c.classList.remove('predict-zone'));
-            try {
-                const res = await fetch(`${API_URL}/predict`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ count: 3 })
-                });
-                const data = await res.json();
-                data.predictions.forEach(id => {
-                    document.querySelectorAll('#grid-pred .grid-cell')[id].classList.add('predict-zone');
-                });
-                
-                // Affichage Confiance
-                document.getElementById('prob-container').classList.remove('hidden');
-                document.getElementById('prob-value').innerText = data.probability;
-                document.getElementById('prob-bar').style.width = data.probability;
-            } catch(e) { alert("Erreur Serveur"); }
-        }
-
-        async function sendToDatabase() {
-            if(trainingMines.length === 0) return alert("Cochez les mines !");
-            try {
-                await fetch(`${API_URL}/train`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ mines: trainingMines })
-                });
-                alert("Appris !");
-                trainingMines = [];
-                document.querySelectorAll('#grid-train .grid-cell').forEach(c => c.classList.remove('active'));
-                updateStats();
-            } catch(e) { alert("Erreur"); }
-        }
-
-        function showPage(page) {
-            document.getElementById('page-prediction').classList.toggle('hidden', page !== 'prediction');
-            document.getElementById('page-training').classList.toggle('hidden', page !== 'training');
-            document.getElementById('tab-pred').classList.toggle('text-gray-500', page !== 'prediction');
-            document.getElementById('tab-train').classList.toggle('text-gray-500', page !== 'training');
-        }
-
-        init();
-    </script>
-</body>
-</html>                cP.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] text-slate-600';
-                cP.innerText = i;
-                gP.appendChild(cP);
-
-                const cT = document.createElement('div');
-                cT.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] text-slate-500';
-                cT.innerText = i;
-                cT.onclick = () => {
-                    if(trainingMines.includes(i)) {
-                        trainingMines = trainingMines.filter(m => m !== i);
-                        cT.classList.remove('active');
-                    } else {
-                        trainingMines.push(i);
-                        cT.classList.add('active');
-                    }
-                };
-                gT.appendChild(cT);
-            }
-            updateStats();
-        }
-
-        async function updateStats() {
-            try {
-                const res = await fetch(`${API_URL}/stats`);
-                const data = await res.json();
-                document.getElementById('db-count').innerText = data.total_sessions;
-            } catch(e) { console.log("Erreur stats"); }
-        }
-
+        // Navigation entre onglets
         function showPage(page) {
             document.getElementById('page-prediction').classList.toggle('hidden', page !== 'prediction');
             document.getElementById('page-training').classList.toggle('hidden', page !== 'training');
             document.getElementById('tab-pred').classList.toggle('tab-active', page === 'prediction');
+            document.getElementById('tab-pred').classList.toggle('text-gray-500', page !== 'prediction');
             document.getElementById('tab-train').classList.toggle('tab-active', page === 'training');
-            // Cacher la probabilité si on change de page
-            if(page === 'training') document.getElementById('prob-container').classList.add('hidden');
+            document.getElementById('tab-train').classList.toggle('text-gray-500', page !== 'training');
         }
 
+        // Action : Prédire
         async function getPrediction() {
             const count = document.getElementById('mine-count').value;
+            // Nettoyage avant nouvelle prédiction
             document.querySelectorAll('#grid-pred .grid-cell').forEach(c => c.classList.remove('predict-zone'));
             
             try {
                 const res = await fetch(`${API_URL}/predict`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ count: count })
+                    body: JSON.stringify({ count: parseInt(count) })
                 });
                 const data = await res.json();
                 
-                // Affichage des cases
-                data.predictions.forEach(id => {
-                    document.querySelectorAll('#grid-pred .grid-cell')[id].classList.add('predict-zone');
-                });
-
-                // Affichage de la probabilité
-                if(data.probability) {
-                    const probCont = document.getElementById('prob-container');
-                    const probVal = document.getElementById('prob-value');
-                    const probBar = document.getElementById('prob-bar');
-                    
-                    probCont.classList.remove('hidden');
-                    probVal.innerText = data.probability;
-                    probBar.style.width = data.probability;
-                    
-                    // Couleur dynamique
-                    const p = parseFloat(data.probability);
-                    if(p > 80) { probVal.className = "text-xl font-black text-green-400"; probBar.className = "bg-green-500 h-full transition-all"; }
-                    else if(p > 60) { probVal.className = "text-xl font-black text-yellow-400"; probBar.className = "bg-yellow-500 h-full transition-all"; }
-                    else { probVal.className = "text-xl font-black text-red-400"; probBar.className = "bg-red-500 h-full transition-all"; }
+                // Allumage des cases prédites
+                if (data.predictions) {
+                    data.predictions.forEach(id => {
+                        const cell = document.querySelectorAll('#grid-pred .grid-cell')[id];
+                        if(cell) cell.classList.add('predict-zone');
+                    });
                 }
-            } catch(e) { alert("Erreur Serveur"); }
+
+                // Mise à jour de la probabilité
+                if(data.probability) {
+                    document.getElementById('prob-container').classList.remove('hidden');
+                    document.getElementById('prob-value').innerText = data.probability;
+                    document.getElementById('prob-bar').style.width = data.probability;
+                }
+            } catch(e) { 
+                alert("Erreur de connexion au bot"); 
+            }
         }
 
+        // Action : Enregistrer Entraînement
         async function sendToDatabase() {
-            if(trainingMines.length === 0) return alert("Cochez les mines !");
+            if(trainingMines.length === 0) return alert("Cochez au moins une mine !");
+            
             try {
-                await fetch(`${API_URL}/train`, {
+                const res = await fetch(`${API_URL}/train`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ mines: trainingMines })
                 });
-                alert("Appris !");
-                trainingMines = [];
-                document.querySelectorAll('#grid-train .grid-cell').forEach(c => c.classList.remove('active'));
-                updateStats();
-            } catch(e) { alert("Erreur"); }
+                
+                if(res.ok) {
+                    alert("Session apprise ! ✅");
+                    trainingMines = [];
+                    document.querySelectorAll('#grid-train .grid-cell').forEach(c => c.classList.remove('active'));
+                    updateStats();
+                }
+            } catch(e) { alert("Erreur lors de l'envoi"); }
         }
 
-        async function handleUpload() {
-            const file = document.getElementById('videoFile').files[0];
-            if(!file) return;
-            const btn = document.getElementById('uploadBtn');
-            btn.innerText = "ANALYSE EN COURS...";
-            const formData = new FormData();
-            formData.append('file', file);
-            try {
-                await fetch(`${API_URL}/process_video`, { method: 'POST', body: formData });
-                alert("Cerveau mis à jour via vidéo !");
-                updateStats();
-            } catch(e) { alert("Erreur vidéo"); }
-            btn.innerText = "SCANNER VIDÉO XRECORDER";
-        }
-
+        // Reset visuel
         function resetAll() {
             document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('active', 'predict-zone'));
             document.getElementById('prob-container').classList.add('hidden');
@@ -250,4 +188,4 @@
         init();
     </script>
 </body>
-              </html>
+</html>
