@@ -7,6 +7,7 @@ class MinesPredictor:
         # On initialise avec un modèle simple
         self.model = RandomForestClassifier(n_estimators=100, random_state=42)
         self.is_trained = False
+        self.mine_frequencies = {}
 
     def train_from_history(self, history_data):
         """
@@ -15,24 +16,44 @@ class MinesPredictor:
         if not history_data:
             return
         
-        # Transformation des données pour le ML
-        # X = caractéristiques (nombre de mines, position), y = cible (0: safe, 1: mine)
-        df = pd.DataFrame(history_data)
-        # Logique d'entraînement simplifiée
-        # (À enrichir selon les données collectées via ton proxy)
+        # Calcul des fréquences de mines par position
+        mine_counts = {}
+        total_sessions = len(history_data)
+        
+        for session in history_data:
+            mines = session.get('tiles', [])
+            for mine_pos in mines:
+                mine_counts[mine_pos] = mine_counts.get(mine_pos, 0) + 1
+        
+        # Conversion en probabilités (pourcentage)
+        self.mine_frequencies = {
+            pos: (count / total_sessions) * 100 
+            for pos, count in mine_counts.items()
+        }
+        
         self.is_trained = True
 
     def get_safe_tiles(self, current_history, mines_count):
         """
-        Analyse les probabilités pour les 25 cases (0-24)
+        Retourne les cases les plus sûres avec leurs probabilités
+        Retour: Liste de tuples (tile_index, safety_probability)
         """
-        if not self.is_trained:
-            # Si pas encore de données, on utilise une probabilité basée sur le hasard pur
-            # ou des cases stratégiques (ex: les coins)
-            import random
-            return random.sample([i for i in range(25) if i not in current_history], 3)
-        
-        # Ici on injecterait la logique de prediction.predict_proba
-        # Pour l'instant, on retourne un échantillon intelligent
         available_tiles = [i for i in range(25) if i not in current_history]
-        return available_tiles[:3] # Retourne les 3 cases les plus 'safe'
+        
+        if not self.is_trained or not self.mine_frequencies:
+            # Si pas de données, probabilités par défaut
+            import random
+            tiles = random.sample(available_tiles, min(mines_count, len(available_tiles)))
+            return [(tile, 50.0) for tile in tiles]
+        
+        # Calcul des probabilités de sécurité pour chaque case
+        safety_scores = []
+        for tile in available_tiles:
+            mine_probability = self.mine_frequencies.get(tile, 0)
+            safety_probability = 100 - mine_probability
+            safety_scores.append((tile, safety_probability))
+        
+        # Tri par probabilité de sécurité (décroissant)
+        safety_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        return safety_scores[:mines_count]
