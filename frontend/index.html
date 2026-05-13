@@ -6,77 +6,51 @@
     <title>Mines AI Analyst</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #0f172a; font-family: sans-serif; }
-        .grid-cell { aspect-ratio: 1/1; border: 1px solid rgba(255,255,255,0.05); }
+        body { background-color: #0f172a; }
+        .grid-cell { aspect-ratio: 1/1; border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s; }
         .active { background-color: #ef4444; box-shadow: 0 0 10px #ef4444; }
         .predict-zone { 
             background-color: #00ff00 !important; 
             color: #000 !important; 
-            font-weight: 900 !important;
+            font-weight: 900;
             box-shadow: 0 0 15px #00ff00; 
-            animation: pulse-high 0.8s infinite; 
-            border: 2px solid white !important;
+            animation: pulse 0.8s infinite;
         }
-        @keyframes pulse-high { 
-            0%, 100% { opacity: 1; transform: scale(1); } 
-            50% { opacity: 0.7; transform: scale(0.95); } 
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
         .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; }
     </style>
 </head>
 <body class="text-white">
 
-    <div class="flex justify-between items-center p-3 bg-slate-900 border-b border-slate-800">
-        <div>
-            <h1 class="text-[10px] font-black text-blue-500">BOT ANALYST v2.0</h1>
-            <p class="text-[8px] text-gray-400 font-mono">DB: <span id="db-count" class="text-green-500">0</span> sessions</p>
-        </div>
-        <button onclick="resetAll()" class="text-[9px] bg-slate-700 px-2 py-1 rounded">RESET</button>
+    <div class="flex justify-between items-center p-3 bg-slate-900">
+        <h1 class="text-[10px] font-black text-blue-500 uppercase">Bot Analyst v2.0</h1>
+        <div class="text-[8px] text-gray-400 font-mono">DB: <span id="db-count" class="text-green-500">0</span></div>
     </div>
 
-    <div id="prob-container" class="bg-slate-800 mx-4 mt-4 p-3 rounded-xl border border-slate-700 hidden">
-        <div class="flex justify-between items-center">
-            <span class="text-[10px] uppercase font-bold text-gray-400">Fiabilité du Signal</span>
-            <span id="prob-value" class="text-xl font-black text-green-400">0%</span>
+    <div id="prob-container" class="mx-4 mt-2 p-2 bg-slate-800 rounded border border-slate-700 hidden">
+        <div class="flex justify-between text-[10px] mb-1">
+            <span>CONFIANCE</span>
+            <span id="prob-value" class="font-bold text-green-400">0%</span>
         </div>
-        <div class="w-full bg-slate-700 h-1.5 mt-2 rounded-full overflow-hidden">
-            <div id="prob-bar" class="bg-green-500 h-full transition-all duration-500" style="width: 0%"></div>
+        <div class="w-full bg-slate-900 h-1 rounded-full overflow-hidden">
+            <div id="prob-bar" class="bg-green-500 h-full w-0 transition-all duration-500"></div>
         </div>
     </div>
 
-    <div class="flex bg-slate-900 text-[10px] font-bold uppercase mt-2">
-        <div id="tab-pred" onclick="showPage('prediction')" class="flex-1 py-3 text-center cursor-pointer tab-active">Prédiction</div>
-        <div id="tab-train" onclick="showPage('training')" class="flex-1 py-3 text-center cursor-pointer text-gray-500">Entraînement</div>
+    <div class="flex bg-slate-900 text-[10px] font-bold mt-2">
+        <div id="tab-pred" onclick="showPage('prediction')" class="flex-1 py-3 text-center cursor-pointer tab-active">PRÉDICTION</div>
+        <div id="tab-train" onclick="showPage('training')" class="flex-1 py-3 text-center cursor-pointer text-gray-500">ENTRAÎNEMENT</div>
     </div>
 
     <div class="p-4">
         <div id="page-prediction">
-            <div class="flex items-center justify-between mb-4 bg-slate-800 p-2 rounded-lg">
-                <span class="text-[10px] text-gray-300">Mode de jeu :</span>
-                <select id="mine-count" class="bg-slate-700 text-[10px] rounded px-2 py-1 outline-none">
-                    <option value="1">1 MINE</option>
-                    <option value="3" selected>3 MINES</option>
-                    <option value="5">5 MINES</option>
-                </select>
-            </div>
-            <div id="grid-pred" class="grid grid-cols-5 gap-1 w-full mb-6"></div>
-            <button onclick="getPrediction()" class="w-full bg-blue-600 py-4 rounded-xl font-black text-xs shadow-lg active:scale-95 transition">
-                GÉNÉRER PRÉDICTION 🎯
-            </button>
+            <div id="grid-pred" class="grid grid-cols-5 gap-1 mb-6"></div>
+            <button onclick="getPrediction()" class="w-full bg-blue-600 py-4 rounded-xl font-black text-xs">GÉNÉRER SIGNAL 🎯</button>
         </div>
 
         <div id="page-training" class="hidden">
-            <p class="text-[9px] text-gray-400 mb-2 italic">Cochez les mines révélées à la fin du jeu :</p>
-            <div id="grid-train" class="grid grid-cols-5 gap-1 w-full mb-4"></div>
-            <button onclick="sendToDatabase()" class="w-full bg-indigo-600 py-3 rounded-lg font-bold text-xs mb-6 shadow-lg">
-                ENREGISTRER LA SESSION ✖️
-            </button>
-            <div class="border-t border-slate-800 pt-4">
-                <input type="file" id="videoFile" accept="video/*" class="hidden" onchange="handleUpload()">
-                <button id="uploadBtn" onclick="document.getElementById('videoFile').click()" class="w-full bg-slate-800 border border-slate-700 py-3 rounded text-[10px] text-slate-400">
-                    SCANNER VIDÉO XRECORDER
-                </button>
-            </div>
+            <div id="grid-train" class="grid grid-cols-5 gap-1 mb-4"></div>
+            <button onclick="sendToDatabase()" class="w-full bg-indigo-600 py-3 rounded-lg font-bold text-xs">SAUVEGARDER ✖️</button>
         </div>
     </div>
 
@@ -89,7 +63,81 @@
             const gT = document.getElementById('grid-train');
             for(let i=0; i<25; i++) {
                 const cP = document.createElement('div');
-                cP.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] text-slate-600';
+                cP.className = 'grid-cell bg-slate-800 rounded flex items-center justify-center text-[10px] text-slate-600';
+                cP.innerText = i;
+                gP.appendChild(cP);
+
+                const cT = document.createElement('div');
+                cT.className = 'grid-cell bg-slate-800 rounded flex items-center justify-center text-[10px] text-slate-500';
+                cT.innerText = i;
+                cT.onclick = () => {
+                    if(trainingMines.includes(i)) {
+                        trainingMines = trainingMines.filter(m => m !== i);
+                        cT.classList.remove('active');
+                    } else {
+                        trainingMines.push(i);
+                        cT.classList.add('active');
+                    }
+                };
+                gT.appendChild(cT);
+            }
+            updateStats();
+        }
+
+        async function updateStats() {
+            try {
+                const res = await fetch(`${API_URL}/stats`);
+                const data = await res.json();
+                document.getElementById('db-count').innerText = data.total_sessions;
+            } catch(e) {}
+        }
+
+        async function getPrediction() {
+            document.querySelectorAll('#grid-pred .grid-cell').forEach(c => c.classList.remove('predict-zone'));
+            try {
+                const res = await fetch(`${API_URL}/predict`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ count: 3 })
+                });
+                const data = await res.json();
+                data.predictions.forEach(id => {
+                    document.querySelectorAll('#grid-pred .grid-cell')[id].classList.add('predict-zone');
+                });
+                
+                // Affichage Confiance
+                document.getElementById('prob-container').classList.remove('hidden');
+                document.getElementById('prob-value').innerText = data.probability;
+                document.getElementById('prob-bar').style.width = data.probability;
+            } catch(e) { alert("Erreur Serveur"); }
+        }
+
+        async function sendToDatabase() {
+            if(trainingMines.length === 0) return alert("Cochez les mines !");
+            try {
+                await fetch(`${API_URL}/train`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ mines: trainingMines })
+                });
+                alert("Appris !");
+                trainingMines = [];
+                document.querySelectorAll('#grid-train .grid-cell').forEach(c => c.classList.remove('active'));
+                updateStats();
+            } catch(e) { alert("Erreur"); }
+        }
+
+        function showPage(page) {
+            document.getElementById('page-prediction').classList.toggle('hidden', page !== 'prediction');
+            document.getElementById('page-training').classList.toggle('hidden', page !== 'training');
+            document.getElementById('tab-pred').classList.toggle('text-gray-500', page !== 'prediction');
+            document.getElementById('tab-train').classList.toggle('text-gray-500', page !== 'training');
+        }
+
+        init();
+    </script>
+</body>
+</html>                cP.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] text-slate-600';
                 cP.innerText = i;
                 gP.appendChild(cP);
 
