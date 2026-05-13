@@ -3,9 +3,12 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
 from datetime import datetime
+from model import MinesPredictor
 
 app = Flask(__name__)
 CORS(app)
+
+predictor = MinesPredictor()
 
 # --- CONFIGURATION MONGODB ---
 # Utilise la variable d'environnement MONGO_URI configurée dans Render
