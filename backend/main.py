@@ -48,7 +48,15 @@ def predict():
 
     all_sessions = list(collection_train.find())
     if len(all_sessions) < 2:
-        return jsonify({"predictions": [12, 7, 17, 2, 22][:count]})
+        return jsonify({
+            "predictions": "12;7;17",
+            "probability": "50%",
+            "details": [
+                {"tile": "12", "safety": "50.0%"},
+                {"tile": "7", "safety": "50.0%"},
+                {"tile": "17", "safety": "50.0%"}
+            ]
+        })
 
     # Entraîne le modèle avec l'historique
     history_data = [
@@ -61,7 +69,25 @@ def predict():
     current_history = data.get('current_history', [])
     safe_tiles = predictor.get_safe_tiles(current_history, count)
 
-    return jsonify({"predictions": safe_tiles[:count]})
+    # Formate la réponse avec les probabilités
+    predictions_list = [str(tile) for tile, prob in safe_tiles]
+    predictions_str = ";".join(predictions_list)
+    
+    # Calcule la probabilité moyenne
+    avg_probability = sum(prob for _, prob in safe_tiles) / len(safe_tiles) if safe_tiles else 0
+    probability_str = f"{int(round(avg_probability))}%"
+    
+    # Détails avec probabilités individuelles
+    details = [
+        {"tile": str(tile), "safety": f"{prob:.1f}%"}
+        for tile, prob in safe_tiles
+    ]
+
+    return jsonify({
+        "predictions": predictions_str,
+        "probability": probability_str,
+        "details": details
+    })
 
 @app.route('/stats', methods=['GET'])
 def get_stats():
