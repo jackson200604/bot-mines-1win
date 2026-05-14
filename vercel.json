@@ -1,9 +1,5 @@
 {
-  "cleanUrls": true,
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "https://bot-mines-backend.onrender.com/$1"
-    }
+    { "source": "/(.*)", "destination": "/frontend/index.html" }
   ]
 }
