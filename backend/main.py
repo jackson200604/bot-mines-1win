@@ -1,50 +1,102 @@
 import os
+import traceback
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
-from datetime import datetime
-from model import MinesPredictor
+from model import Predictor
 
 app = Flask(__name__)
-CORS(app)
-predictor = MinesPredictor()
 
-MONGO_URI = os.environ.get("MONGO_URI", "ton_lien_mongodb")
-client = MongoClient(MONGO_URI)
-db = client['mines_bot_db']
-collection_train = db['training_sessions']
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "https://bot-mines-frontend.vercel.app"
+)
+
+CORS(app, resources={
+    r"/*": {
+        "origins": [FRONTEND_URL]
+    }
+})
+
+MONGO_URI = os.getenv("MONGO_URI")
+
+client = MongoClient(
+    MONGO_URI,
+    serverSelectionTimeoutMS=5000
+)
+
+try:
+    client.server_info()
+except Exception:
+    raise Exception("MongoDB inaccessible")
+
+
+db = client["mines"]
+collection_train = db["train"]
+collection_predictions = db["predictions"]
+
+predictor = Predictor()
+
+
+def load_training_data():
+    sessions = list(collection_train.find())
+
+    history_data = [
+        {
+            "tiles": s.get("tiles", [])
+        }
+        for s in sessions
+    ]
+
+    predictor.train_from_history(history_data)
+
+
+load_training_data()
+
+
+@app.route('/health')
+def health():
+    return jsonify({
+        "status": "ok"
+    })
+
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    data = request.json
-    count = int(data.get('count', 3))
-    
-    all_sessions = list(collection_train.find())
-    # Synchronisation des noms de clés : on utilise 'tiles'
-    history_data = [{"tiles": s.get("tiles", [])} for s in all_sessions]
-    predictor.train_from_history(history_data)
+    try:
+        data = request.get_json()
 
-    safe_tiles = predictor.get_safe_tiles([], count)
-    prob_value = predictor.get_confidence_score(safe_tiles)
+        if not data:
+            return jsonify({
+                "error": "JSON invalide"
+            }), 400
 
-    return jsonify({
-        "predictions": safe_tiles,
-        "probability": f"{prob_value}%"
-    })
+        count = int(data.get('count', 3))
 
-@app.route('/train', methods=['POST'])
-def train():
-    data = request.json
-    mines = data.get('mines', [])
-    if not mines: return jsonify({"error": "No mines"}), 400
-    
-    doc = {"date": datetime.now(), "tiles": mines, "count": len(mines)}
-    collection_train.insert_one(doc)
-    return jsonify({"status": "success", "new_total": collection_train.count_documents({})})
+        if count < 1 or count > 10:
+            return jsonify({
+                "error": "count doit être entre 1 et 10"
+            }), 400
 
-@app.route('/stats', methods=['GET'])
-def get_stats():
-    return jsonify({"total_sessions": collection_train.count_documents({})})
+        prediction = predictor.predict_safe_tiles(count)
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+        collection_predictions.insert_one({
+            "prediction": prediction
+        })
+
+        return jsonify({
+            "success": True,
+            "prediction": prediction
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
