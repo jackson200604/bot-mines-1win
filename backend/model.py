@@ -1,46 +1,39 @@
-import numpy as np
+import random
+from collections import Counter
 
-class MinesPredictor:
+
+class Predictor:
     def __init__(self):
-        self.is_trained = False
-        self.mine_frequencies = {}
-        self.raw_history = []
+        self.safe_tiles = []
 
     def train_from_history(self, history_data):
-        if not history_data:
-            return
-        self.raw_history = history_data
-        mine_counts = {}
-        total_sessions = len(history_data)
+        all_tiles = []
+
         for session in history_data:
-            # On s'assure de lire 'tiles' qui vient de main.py
-            mines = session.get('tiles', [])
-            for mine_pos in mines:
-                mine_counts[mine_pos] = mine_counts.get(mine_pos, 0) + 1
-        
-        self.mine_frequencies = {
-            pos: (count / total_sessions) * 100 
-            for pos, count in mine_counts.items()
-        }
-        self.is_trained = True
+            tiles = session.get("tiles", [])
+            all_tiles.extend(tiles)
 
-    def get_safe_tiles(self, current_history, mines_count):
-        available_tiles = [i for i in range(25) if i not in current_history]
-        if not self.is_trained:
-            import random
-            return random.sample(available_tiles, min(int(mines_count), len(available_tiles)))
-        
-        safety_scores = []
-        for tile in available_tiles:
-            mine_probability = self.mine_frequencies.get(tile, 0)
-            safety_scores.append((tile, 100 - mine_probability))
-        
-        safety_scores.sort(key=lambda x: x[1], reverse=True)
-        return [tile for tile, score in safety_scores[:int(mines_count)]]
+        counts = Counter(all_tiles)
 
-    def get_confidence_score(self, predicted_tiles):
-        if not self.raw_history or not predicted_tiles:
-            return 50.0
-        wins = sum(1 for s in self.raw_history if not any(t in s.get('tiles', []) for t in predicted_tiles))
-        score = (wins / len(self.raw_history)) * 100
-        return round(max(50.0, min(98.5, score)), 1)
+        least_common = counts.most_common()
+
+        sorted_tiles = [
+            tile
+            for tile, _ in least_common
+        ]
+
+        self.safe_tiles = sorted_tiles
+
+    def predict_safe_tiles(self, count=3):
+        if not self.safe_tiles:
+            return random.sample(range(1, 26), count)
+
+        prediction = self.safe_tiles[:count]
+
+        while len(prediction) < count:
+            rand_tile = random.randint(1, 25)
+
+            if rand_tile not in prediction:
+                prediction.append(rand_tile)
+
+        return prediction
