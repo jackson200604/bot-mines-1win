@@ -1,39 +1,54 @@
-import random
-from collections import Counter
+"""
+MinesPredictor — frequency-based safe cell predictor.
 
+Wraps the same logic used in main.py's /predict route so it can be
+imported, tested, or extended independently (e.g. with a real ML model).
+"""
 
-class Predictor:
+class MinesPredictor:
     def __init__(self):
-        self.safe_tiles = []
+        self.cell_counts = [0] * 25  # cumulative mine frequency per cell
+        self.session_count = 0
 
-    def train_from_history(self, history_data):
-        all_tiles = []
+    def add_session(self, mines: list[int]):
+        """Record a completed game session.
 
-        for session in history_data:
-            tiles = session.get("tiles", [])
-            all_tiles.extend(tiles)
+        Args:
+            mines: List of cell indices (0-24) where mines were located.
+        """
+        if not mines:
+            return
+        mines = [m for m in set(mines) if isinstance(m, int) and 0 <= m <= 24]
+        for idx in mines:
+            self.cell_counts[idx] += 1
+        self.session_count += 1
 
-        counts = Counter(all_tiles)
+    def get_safe_tiles(self, count: int = 3, exclude: list[int] = None) -> list[int]:
+        """Return the `count` cells least likely to contain a mine.
 
-        least_common = counts.most_common()
+        Args:
+            count:   Number of safe cell predictions to return.
+            exclude: Cell indices already revealed; skip these.
 
-        sorted_tiles = [
-            tile
-            for tile, _ in least_common
-        ]
+        Returns:
+            List of cell indices sorted from safest to least safe.
+        """
+        exclude = set(exclude or [])
+        available = [(i, self.cell_counts[i]) for i in range(25) if i not in exclude]
+        available.sort(key=lambda x: x[1])  # ascending: fewest mines = safest
+        return [cell for cell, _ in available[:count]]
 
-        self.safe_tiles = sorted_tiles
+    def from_mongo_sessions(self, sessions: list[dict]):
+        """Populate predictor from a list of MongoDB session documents.
 
-    def predict_safe_tiles(self, count=3):
-        if not self.safe_tiles:
-            return random.sample(range(1, 26), count)
-
-        prediction = self.safe_tiles[:count]
-
-        while len(prediction) < count:
-            rand_tile = random.randint(1, 25)
-
-            if rand_tile not in prediction:
-                prediction.append(rand_tile)
-
-        return prediction
+        Args:
+            sessions: List of dicts with a 'grid' key (25-element 0/1 list).
+        """
+        self.cell_counts = [0] * 25
+        self.session_count = 0
+        for s in sessions:
+            grid = s.get('grid', [])
+            if len(grid) == 25:
+                for idx, val in enumerate(grid):
+                    self.cell_counts[idx] += val
+                self.session_count += 1
