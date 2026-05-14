@@ -2,237 +2,242 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bot Mines Predictor</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mines AI Analyst</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: Arial, sans-serif;
+        body { background-color: #0f172a; font-family: sans-serif; }
+        .grid-cell { aspect-ratio: 1/1; border: 1px solid rgba(255,255,255,0.05); }
+        .active { background-color: #ef4444; box-shadow: 0 0 10px #ef4444; }
+        .predict-zone { 
+            background-color: #00ff00 !important;
+            color: #ffffff !important;
+            font-weight: 900 !important;
+            box-shadow: 0 0 15px #00ff00;
+            animation: pulse-high 0.8s infinite; 
+            border: 2px solid white !important;
         }
-
-        body {
-            background: #0f172a;
-            color: white;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
+        @keyframes pulse-high { 
+            0%, 100% { opacity: 1; transform: scale(1); } 
+            50% { opacity: 0.7; transform: scale(0.95); } 
         }
-
-        .container {
-            width: 100%;
-            max-width: 500px;
-            background: #1e293b;
-            padding: 30px;
-            border-radius: 20px;
-            box-shadow: 0 0 25px rgba(0,0,0,0.3);
-        }
-
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            font-size: 28px;
-        }
-
-        p {
-            text-align: center;
-            margin-bottom: 25px;
-            color: #cbd5e1;
-        }
-
-        .controls {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        input {
-            width: 100%;
-            padding: 14px;
-            border: none;
-            border-radius: 10px;
-            background: #334155;
-            color: white;
-            font-size: 16px;
-        }
-
-        button {
-            padding: 14px;
-            border: none;
-            border-radius: 10px;
-            background: #22c55e;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        button:hover {
-            background: #16a34a;
-        }
-
-        .loading {
-            text-align: center;
-            margin-top: 20px;
-            display: none;
-        }
-
-        .result {
-            margin-top: 25px;
-            background: #334155;
-            padding: 20px;
-            border-radius: 12px;
-            display: none;
-        }
-
-        .tiles {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .tile {
-            width: 100%;
-            aspect-ratio: 1;
-            background: #1e293b;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 10px;
-            font-weight: bold;
-        }
-
-        .safe {
-            background: #22c55e;
-        }
-
-        .error {
-            margin-top: 20px;
-            padding: 12px;
-            background: #dc2626;
-            border-radius: 10px;
-            display: none;
-            text-align: center;
-        }
+        .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; }
+        .btn-loading { opacity: 0.6; pointer-events: none; cursor: not-allowed; }
     </style>
 </head>
-<body>
+<body class="text-white">
 
-<div class="container">
-    <h1>Bot Mines Predictor</h1>
-
-    <p>
-        Génération automatique des cases supposées sûres.
-    </p>
-
-    <div class="controls">
-        <input
-            type="number"
-            id="count"
-            placeholder="Nombre de cases"
-            min="1"
-            max="10"
-            value="3"
-        >
-
-        <button onclick="getPrediction()">
-            Générer une prédiction
-        </button>
+    <div class="flex justify-between items-center p-3 bg-slate-900 border-b border-slate-800">
+        <div>
+            <h1 class="text-[10px] font-black text-blue-500">BOT ANALYST v2.0</h1>
+            <p class="text-[8px] text-gray-400 font-mono">DB: <span id="db-count" class="text-green-500">0</span> sessions</p>
+        </div>
+        <button onclick="resetAll()" class="text-[9px] bg-slate-700 px-2 py-1 rounded">RESET</button>
     </div>
 
-    <div class="loading" id="loading">
-        Chargement...
+    <div class="flex bg-slate-900 text-[10px] font-bold uppercase">
+        <div id="tab-pred" onclick="showPage('prediction')" class="flex-1 py-3 text-center cursor-pointer tab-active">Prédiction</div>
+        <div id="tab-train" onclick="showPage('training')" class="flex-1 py-3 text-center cursor-pointer text-gray-500">Entraînement</div>
     </div>
 
-    <div class="error" id="error"></div>
+    <div class="p-4">
+        <div id="page-prediction">
+            <div class="flex items-center justify-between mb-4 bg-slate-800 p-2 rounded-lg">
+                <span class="text-[10px] text-gray-300">Mode de jeu :</span>
+                <select id="mine-count" class="bg-slate-700 text-[10px] rounded px-2 py-1 outline-none">
+                    <option value="1">1 MINE</option>
+                    <option value="3" selected>3 MINES</option>
+                    <option value="5">5 MINES</option>
+                </select>
+            </div>
+            <div id="grid-pred" class="grid grid-cols-5 gap-1 w-full mb-6"></div>
+            <button id="btn-predict" onclick="getPrediction()" class="w-full bg-blue-600 py-4 rounded-xl font-black text-xs shadow-lg active:scale-95 transition">
+                GÉNÉRER PRÉDICTION 🎯
+            </button>
+        </div>
 
-    <div class="result" id="result">
-        <h2>Cases prédites</h2>
-
-        <div class="tiles" id="tiles"></div>
+        <div id="page-training" class="hidden">
+            <p class="text-[9px] text-gray-400 mb-2 italic">Cochez les mines révélées à la fin du jeu :</p>
+            <div id="grid-train" class="grid grid-cols-5 gap-1 w-full mb-4"></div>
+            <button onclick="sendToDatabase()" class="w-full bg-indigo-600 py-3 rounded-lg font-bold text-xs mb-6 shadow-lg">
+                ENREGISTRER LA SESSION ✖️
+            </button>
+            <div class="border-t border-slate-800 pt-4">
+                <input type="file" id="videoFile" accept="video/*" class="hidden" onchange="handleUpload()">
+                <button id="uploadBtn" onclick="document.getElementById('videoFile').click()" class="w-full bg-slate-800 border border-slate-700 py-3 rounded text-[10px] text-slate-400">
+                    SCANNER VIDÉO XRECORDER
+                </button>
+                <p id="video-status" class="text-[9px] text-center mt-2 text-slate-500 hidden"></p>
+            </div>
+        </div>
     </div>
-</div>
 
-<script>
-const API_URL = '/api'
+    <script>
+        const API_URL = 'https://bot-mines-1win.onrender.com';
 
-const loadingEl = document.getElementById('loading')
-const resultEl = document.getElementById('result')
-const errorEl = document.getElementById('error')
-const tilesEl = document.getElementById('tiles')
-
-async function getPrediction() {
-    try {
-        loadingEl.style.display = 'block'
-        resultEl.style.display = 'none'
-        errorEl.style.display = 'none'
-
-        const count = parseInt(
-            document.getElementById('count').value
-        )
-
-        if (count < 1 || count > 10) {
-            throw new Error('Le nombre doit être entre 1 et 10')
+        function getApiKey() {
+            return localStorage.getItem('api_key') || '';
         }
 
-        const response = await fetch(`${API_URL}/predict`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                count
-            })
-        })
-
-        if (!response.ok) {
-            throw new Error(`Erreur serveur ${response.status}`)
+        function apiHeaders(isJson = true) {
+            const h = { 'X-API-Key': getApiKey() };
+            if (isJson) h['Content-Type'] = 'application/json';
+            return h;
         }
 
-        const data = await response.json()
+        let trainingMines = [];
 
-        if (!data.success) {
-            throw new Error(data.error || 'Erreur inconnue')
+        function init() {
+            const gP = document.getElementById('grid-pred');
+            const gT = document.getElementById('grid-train');
+            for (let i = 0; i < 25; i++) {
+                const cP = document.createElement('div');
+                cP.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] text-slate-600';
+                cP.innerText = i;
+                gP.appendChild(cP);
+
+                const cT = document.createElement('div');
+                cT.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] text-slate-500';
+                cT.innerText = i;
+                cT.onclick = () => {
+                    if (trainingMines.includes(i)) {
+                        trainingMines = trainingMines.filter(m => m !== i);
+                        cT.classList.remove('active');
+                    } else {
+                        trainingMines.push(i);
+                        cT.classList.add('active');
+                    }
+                };
+                gT.appendChild(cT);
+            }
+            updateStats();
         }
 
-        displayPrediction(data.prediction)
-
-    } catch (e) {
-        console.error(e)
-
-        errorEl.style.display = 'block'
-        errorEl.innerText = e.message
-
-    } finally {
-        loadingEl.style.display = 'none'
-    }
-}
-
-function displayPrediction(predictions) {
-    resultEl.style.display = 'block'
-
-    tilesEl.innerHTML = ''
-
-    for (let i = 1; i <= 25; i++) {
-        const tile = document.createElement('div')
-
-        tile.classList.add('tile')
-
-        if (predictions.includes(i)) {
-            tile.classList.add('safe')
+        async function updateStats() {
+            try {
+                const res = await fetch(`${API_URL}/stats`, { headers: apiHeaders(false) });
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('db-count').innerText = data.total_sessions;
+                }
+            } catch (e) { console.log("Erreur stats"); }
         }
 
-        tile.innerText = i
+        function showPage(page) {
+            document.getElementById('page-prediction').classList.toggle('hidden', page !== 'prediction');
+            document.getElementById('page-training').classList.toggle('hidden', page !== 'training');
+            document.getElementById('tab-pred').classList.toggle('tab-active', page === 'prediction');
+            document.getElementById('tab-pred').classList.toggle('text-gray-500', page !== 'prediction');
+            document.getElementById('tab-train').classList.toggle('tab-active', page === 'training');
+            document.getElementById('tab-train').classList.toggle('text-gray-500', page !== 'training');
+        }
 
-        tilesEl.appendChild(tile)
-    }
-}
-</script>
+        async function getPrediction() {
+            const count = document.getElementById('mine-count').value;
+            const btn = document.getElementById('btn-predict');
 
+            document.querySelectorAll('#grid-pred .grid-cell').forEach(c => c.classList.remove('predict-zone'));
+
+            btn.innerText = 'ANALYSE EN COURS... ⏳';
+            btn.classList.add('btn-loading');
+
+            try {
+                const res = await fetch(`${API_URL}/predict`, {
+                    method: 'POST',
+                    headers: apiHeaders(),
+                    body: JSON.stringify({ count: count })
+                });
+                if (res.status === 401) {
+                    alert("Clé API invalide. Vérifiez votre configuration.");
+                    return;
+                }
+                if (!res.ok) {
+                    alert("Erreur Serveur (" + res.status + ")");
+                    return;
+                }
+                const data = await res.json();
+                const cells = document.querySelectorAll('#grid-pred .grid-cell');
+                data.predictions.forEach(id => {
+                    if (cells[id]) cells[id].classList.add('predict-zone');
+                });
+            } catch (e) {
+                alert("Erreur Serveur — le backend est peut-être en train de démarrer, réessayez dans 30s.");
+            } finally {
+                btn.innerText = 'GÉNÉRER PRÉDICTION 🎯';
+                btn.classList.remove('btn-loading');
+            }
+        }
+
+        async function sendToDatabase() {
+            if (trainingMines.length === 0) return alert("Cochez les mines !");
+            try {
+                const res = await fetch(`${API_URL}/train`, {
+                    method: 'POST',
+                    headers: apiHeaders(),
+                    body: JSON.stringify({ mines: trainingMines })
+                });
+                if (res.status === 401) {
+                    alert("Clé API invalide.");
+                    return;
+                }
+                alert("Appris !");
+                trainingMines = [];
+                document.querySelectorAll('#grid-train .grid-cell').forEach(c => c.classList.remove('active'));
+                updateStats();
+            } catch (e) { alert("Erreur"); }
+        }
+
+        async function handleUpload() {
+            const file = document.getElementById('videoFile').files[0];
+            if (!file) return;
+
+            const btn = document.getElementById('uploadBtn');
+            const status = document.getElementById('video-status');
+            btn.innerText = "ANALYSE EN COURS...";
+            btn.disabled = true;
+            status.classList.remove('hidden');
+            status.innerText = "";
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch(`${API_URL}/process_video`, {
+                    method: 'POST',
+                    headers: { 'X-API-Key': getApiKey() },
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (res.status === 501) {
+                    status.innerText = data.message || "Fonctionnalité non disponible.";
+                    status.classList.add('text-yellow-400');
+                } else if (res.ok) {
+                    status.innerText = "Cerveau mis à jour via vidéo !";
+                    status.classList.add('text-green-400');
+                    updateStats();
+                } else {
+                    status.innerText = "Erreur serveur (" + res.status + ")";
+                    status.classList.add('text-red-400');
+                }
+            } catch (e) {
+                status.innerText = "Erreur de connexion.";
+                status.classList.add('text-red-400');
+            } finally {
+                btn.innerText = "SCANNER VIDÉO XRECORDER";
+                btn.disabled = false;
+            }
+
+            document.getElementById('videoFile').value = '';
+        }
+
+        function resetAll() {
+            document.querySelectorAll('#grid-pred .grid-cell').forEach(c => c.classList.remove('predict-zone'));
+            document.querySelectorAll('#grid-train .grid-cell').forEach(c => c.classList.remove('active'));
+            trainingMines = [];
+        }
+
+        init();
+    </script>
 </body>
 </html>
