@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mines AI Analyst</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; font-family: sans-serif; }
+        .grid-cell { aspect-ratio: 1/1; border: 1px solid rgba(255,255,255,0.05); }
+        .active { background-color: #ef4444; box-shadow: 0 0 10px #ef4444; }
+        .predict-zone { 
+            background-color: #00ff00 !important;
+            color: #ffffff !important;
+            font-weight: 900 !important;
+            box-shadow: 0 0 15px #00ff00;
+            animation: pulse-high 0.8s infinite; 
+            border: 2px solid white !important;
+        }
+        @keyframes pulse-high { 
+            0%, 100% { opacity: 1; transform: scale(1); } 
+            50% { opacity: 0.7; transform: scale(0.95); } 
+        }
+        .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; }
+        .btn-loading { opacity: 0.6; pointer-events: none; cursor: not-allowed; }
+    </style>
+
+    <!-- ============ EXTENSIONS CSS ============ -->
+    <style>
+        /* Animation d'apparition des prédictions */
+        .predict-zone {
+            animation: pulse-high 0.8s infinite, fadeInScale 0.4s ease-out;
+        }
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.3) rotate(180deg); }
+            to { opacity: 1; transform: scale(1) rotate(0deg); }
+        }
+
+        /* Effet clic sur cellules */
+        .grid-cell {
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.15s ease;
+            cursor: pointer;
+        }
+        .grid-cell:active { transform: scale(0.92); }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: bold;
+            z-index: 9999;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            border-left: 4px solid #3b82f6;
+            animation: slideDown 0.3s ease-out;
+            max-width: 85%;
+            text-align: center;
+        }
+        .toast.success { border-left-color: #10b981; }
+        .toast.error { border-left-color: #ef4444; }
+        .toast.warning { border-left-color: #f59e0b; }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translate(-50%, -30px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
+        /* Compteur flottant de mines sélectionnées */
+        #mine-counter {
+            position: fixed;
+            bottom: 80px;
+            right: 15px;
+            background: #ef4444;
+            color: white;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(239,68,68,0.5);
+            z-index: 100;
+            animation: pulse-counter 1.5s infinite;
+        }
+        #mine-counter.hidden { display: none; }
+        @keyframes pulse-counter {
+            0%, 100% { box-shadow: 0 4px 12px rgba(239,68,68,0.5); }
+            50% { box-shadow: 0 4px 20px rgba(239,68,68,0.9); }
+        }
+    </style>
+</head>
+<body class="text-white">
+
+    <div class="flex justify-between items-center p-3 bg-slate-900 border-b border-slate-800">
+        <div>
+            <h1 class="text-[10px] font-black text-blue-500">BOT ANALYST v2.0</h1>
+            <p class="text-[8px] text-gray-400 font-mono">DB: <span id="db-count" class="text-green-500">0</span> sessions</p>
+        </div>
+        <button onclick="resetAll()" class="text-[9px] bg-slate-700 px-2 py-1 rounded">RESET</button>
+    </div>
+
+    <div class="flex bg-slate-900 text-[10px] font-bold uppercase">
+        <div id="tab-pred" onclick="showPage('prediction')" class="flex-1 py-3 text-center cursor-pointer tab-active">Prédiction</div>
+        <div id="tab-train" onclick="showPage('training')" class="flex-1 py-3 text-center cursor-pointer text-gray-500">Entraînement</div>
+    </div>
+
+    <div class="p-4">
+        <div id="page-prediction">
+            <div class="flex items-center justify-between mb-4 bg-slate-800 p-2 rounded-lg">
+                <span class="text-[10px] text-gray-300">Mode de jeu :</span>
+                <select id="mine-count" class="bg-slate-700 text-[10px] rounded px-2 py-1 outline-none">
+                    <option value="1">1 MINE</option>
+                    <option value="3" selected>3 MINES</option>
+                    <option value="5">5 MINES</option>
+                </select>
+            </div>
+            <div id="grid-pred" class="grid grid-cols-5 gap-1 w-full mb-6"></div>
+            <button id="btn-predict" onclick="getPrediction()" class="w-full bg-blue-600 py-4 rounded-xl font-black text-xs shadow-lg active:scale-95 transition">
+                GÉNÉRER PRÉDICTION 🎯
+            </button>
+        </div>
+
+        <div id="page-training" class="hidden">
+            <p class="text-[9px] text-gray-400 mb-2 italic">Cochez les mines révélées à la fin du jeu :</p>
+            <div id="grid-train" class="grid grid-cols-5 gap-1 w-full mb-4"></div>
+            <button onclick="sendToDatabase()" class="w-full bg-indigo-600 py-3 rounded-lg font-bold text-xs mb-6 shadow-lg">
+                ENREGISTRER LA SESSION ✖️
+            </button>
+            <div class="border-t border-slate-800 pt-4">
+                <input type="file" id="videoFile" accept="video/*" class="hidden" onchange="handleUpload()">
+                <button id="uploadBtn" onclick="document.getElementById('videoFile').click()" class="w-full bg-slate-800 border border-slate-700 py-3 rounded text-[10px] text-slate-400">
+                    SCANNER VIDÉO XRECORDER
+                </button>
+                <p id="video-status" class="text-[9px] text-center mt-2 text-slate-500 hidden"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://bot-mines-1win-usod.onrender.com';
+
+        function getApiKey() {
+            return localStorage.getItem('api_key') || '';
+        }
+
+        function apiHeaders(isJson = true) {
+            const h = { 'X-API-Key': getApiKey() };
+            if (isJson) h['Content-Type'] = 'application/json';
+            return h;
+        }
+
+        let trainingMines = [];
+
+        function init() {
+            const gP = document.getElementById('grid-pred');
+            const gT = document.getElementById('grid-train');
+            for (let i = 0; i < 25; i++) {
+                const cP = document.createElement('div');
+                cP.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] text-slate-600';
+                cP.innerText = i;
+                gP.appendChild(cP);
+
+                const cT = document.createElement('div');
+                cT.className = 'grid-cell bg-slate-800 rounded-sm flex items-center justify-center text-[10px] text-slate-500';
+                cT.innerText = i;
+                cT.onclick = () => {
+                    if (trainingMines.includes(i)) {
+                        trainingMines = trainingMines.filter(m => m !== i);
+                        cT.classList.remove('active');
+                    } else {
+                        trainingMines.push(i);
+                        cT.classList.add('active');
+                    }
+                };
+                gT.appendChild(cT);
+            }
+            updateStats();
+        }
+
+        async function updateStats() {
+            try {
+                const res = await fetch(`${API_URL}/stats`, { headers: apiHeaders(false) });
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('db-count').innerText = data.total_sessions;
+                }
+            } catch (e) { console.log("Erreur stats"); }
+        }
+
+        function showPage(page) {
+            document.getElementById('page-prediction').classList.toggle('hidden', page !== 'prediction');
+            document.getElementById('page-training').classList.toggle('hidden', page !== 'training');
+            document.getElementById('tab-pred').classList.toggle('tab-active', page === 'prediction');
+            document.getElementById('tab-pred').classList.toggle('text-gray-500', page !== 'prediction');
+            document.getElementById('tab-train').classList.toggle('tab-active', page === 'training');
+            document.getElementById('tab-train').classList.toggle('text-gray-500', page !== 'training');
+        }
+
+        async function getPrediction() {
+            const count = document.getElementById('mine-count').value;
+            const btn = document.getElementById('btn-predict');
+
+            document.querySelectorAll('#grid-pred .grid-cell').forEach(c => c.classList.remove('predict-zone'));
+
+            btn.innerText = 'ANALYSE EN COURS... ⏳';
+            btn.classList.add('btn-loading');
+
+            try {
+                const res = await fetch(`${API_URL}/predict`, {
+                    method: 'POST',
+                    headers: apiHeaders(),
+                    body: JSON.stringify({ count: count })
+                });
+                if (res.status === 401) {
+                    alert("Clé API invalide. Vérifiez votre configuration.");
+                    return;
+                }
+                if (!res.ok) {
+                    alert("Erreur Serveur (" + res.status + ")");
+                    return;
+                }
+                const data = await res.json();
+                const cells = document.querySelectorAll('#grid-pred .grid-cell');
+                data.predictions.forEach(id => {
+                    if (cells[id]) cells[id].classList.add('predict-zone');
+                });
+            } catch (e) {
+                alert("Erreur Serveur — le backend est peut-être en train de démarrer, réessayez dans 30s.");
+            } finally {
+                btn.innerText = 'GÉNÉRER PRÉDICTION 🎯';
+                btn.classList.remove('btn-loading');
+            }
+        }
+
+        async function sendToDatabase() {
+            if (trainingMines.length === 0) return alert("Cochez les mines !");
+            try {
+                const res = await fetch(`${API_URL}/train`, {
+                    method: 'POST',
+                    headers: apiHeaders(),
+                    body: JSON.stringify({ mines: trainingMines })
+                });
+                if (res.status === 401) {
+                    alert("Clé API invalide.");
+                    return;
+                }
+                alert("Appris !");
+                trainingMines = [];
+                document.querySelectorAll('#grid-train .grid-cell').forEach(c => c.classList.remove('active'));
+                updateStats();
+            } catch (e) { alert("Erreur"); }
+        }
+
+        async function handleUpload() {
+            const file = document.getElementById('videoFile').files[0];
+            if (!file) return;
+
+            const btn = document.getElementById('uploadBtn');
+            const status = document.getElementById('video-status');
+            btn.innerText = "ANALYSE EN COURS...";
+            btn.disabled = true;
+            status.classList.remove('hidden');
+            status.innerText = "";
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch(`${API_URL}/process_video`, {
+                    method: 'POST',
+                    headers: { 'X-API-Key': getApiKey() },
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (res.status === 501) {
+                    status.innerText = data.message || "Fonctionnalité non disponible.";
+                    status.classList.add('text-yellow-400');
+                } else if (res.ok) {
+                    status.innerText = "Cerveau mis à jour via vidéo !";
+                    status.classList.add('text-green-400');
+                    updateStats();
+                } else {
+                    status.innerText = "Erreur serveur (" + res.status + ")";
+                    status.classList.add('text-red-400');
+                }
+            } catch (e) {
+                status.innerText = "Erreur de connexion.";
+                status.classList.add('text-red-400');
+            } finally {
+                btn.innerText = "SCANNER VIDÉO XRECORDER";
+                btn.disabled = false;
+            }
+
+            document.getElementById('videoFile').value = '';
+        }
+
+        function resetAll() {
+            document.querySelectorAll('#grid-pred .grid-cell').forEach(c => c.classList.remove('predict-zone'));
+            document.querySelectorAll('#grid-train .grid-cell').forEach(c => c.classList.remove('active'));
+            trainingMines = [];
+        }
+
+        init();
+    </script>
+
+    <!-- ============ EXTENSIONS JS ============ -->
+    <script>
+        // ==== Toast notifications (remplace alert bloquant) ====
+        function showToast(msg, type = 'info') {
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerText = msg;
+            document.body.appendChild(t);
+            setTimeout(() => {
+                t.style.opacity = '0';
+                t.style.transition = 'opacity 0.3s';
+                setTimeout(() => t.remove(), 300);
+            }, 2500);
+        }
+
+        // Override alert pour utiliser toast partout
+        const _origAlert = window.alert;
+        window.alert = (msg) => {
+            const type = /erreur|invalide/i.test(msg) ? 'error'
+                       : /appris|mis à jour/i.test(msg) ? 'success'
+                       : /cochez/i.test(msg) ? 'warning'
+                       : 'info';
+            showToast(msg, type);
+        };
+
+        // ==== Compteur flottant de mines sélectionnées ====
+        const counter = document.createElement('div');
+        counter.id = 'mine-counter';
+        counter.className = 'hidden';
+        counter.innerText = '0';
+        document.body.appendChild(counter);
+
+        const gridTrainEl = document.getElementById('grid-train');
+        const observer = new MutationObserver(() => {
+            const n = document.querySelectorAll('#grid-train .active').length;
+            counter.innerText = n;
+            const trainingVisible = !document.getElementById('page-training').classList.contains('hidden');
+            counter.classList.toggle('hidden', n === 0 || !trainingVisible);
+        });
+        observer.observe(gridTrainEl, { subtree: true, attributes: true, attributeFilter: ['class'] });
+
+        document.getElementById('tab-train').addEventListener('click', () => {
+            setTimeout(() => {
+                const n = document.querySelectorAll('#grid-train .active').length;
+                counter.classList.toggle('hidden', n === 0);
+            }, 50);
+        });
+        document.getElementById('tab-pred').addEventListener('click', () => {
+            counter.classList.add('hidden');
+        });
+
+        // ==== Feedback sonore léger (WebAudio, sans fichier externe) ====
+        function beep(freq = 880, duration = 100) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.frequency.value = freq;
+                osc.type = 'sine';
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration / 1000);
+                osc.start();
+                osc.stop(ctx.currentTime + duration / 1000);
+            } catch (e) {}
+        }
+
+        // ==== Hook non-invasif sur getPrediction : son + historique ====
+        const _origPredict = window.getPrediction;
+        window.getPrediction = async function () {
+            await _origPredict.apply(this, arguments);
+            const zones = [...document.querySelectorAll('#grid-pred .predict-zone')]
+                            .map(c => parseInt(c.innerText));
+            if (zones.length) {
+                beep(1200, 80);
+                setTimeout(() => beep(1600, 120), 100);
+                const hist = JSON.parse(localStorage.getItem('pred_history') || '[]');
+                hist.unshift({ ts: Date.now(), zones, mode: document.getElementById('mine-count').value });
+                localStorage.setItem('pred_history', JSON.stringify(hist.slice(0, 20)));
+            }
+        };
+
+        console.log('%c[EXT] Extensions chargées ✓', 'color:#10b981;font-weight:bold');
+    </script>
+</body>
+</html>
