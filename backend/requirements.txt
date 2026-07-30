@@ -1,7 +1,7 @@
-flask
-flask-cors
-flask-limiter
-pandas
-pymongo
-dnspython
-gunicorn
+flask==3.0.0
+flask-cors==4.0.0
+pymongo==4.6.1
+dnspython==2.4.2
+gunicorn==21.2.0
+torch>=2.1.0
+numpy>=1.24.0
